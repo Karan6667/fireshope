@@ -19,10 +19,5 @@
       "src": "/(.*)",
       "dest": "/all-mongodb.html"
     }
-  ],
-  "functions": {
-    "server.js": {
-      "maxDuration": 30
-    }
-  }
+  ]
 }
