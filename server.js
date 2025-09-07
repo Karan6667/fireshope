@@ -701,7 +701,17 @@ app.get('/api/health', (req, res) => {
 
 // Simple test endpoint
 app.get('/api/test', (req, res) => {
-  res.json({ message: 'API is working!' });
+  res.json({ 
+    message: 'API is working!',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV,
+    vercel: !!process.env.VERCEL
+  });
+});
+
+// Basic connectivity test
+app.get('/api/ping', (req, res) => {
+  res.json({ pong: true, time: Date.now() });
 });
 
 // Global error handler
@@ -716,11 +726,19 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'all-mongodb.html'));
 });
 
+// Add request logging middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  next();
+});
+
 // Start server (only if not in Vercel environment)
 if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+} else {
+  console.log('Running in Vercel environment');
 }
 
 // Export for Vercel
