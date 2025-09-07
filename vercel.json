@@ -12,12 +12,8 @@
       "dest": "/server.js"
     },
     {
-      "src": "/",
-      "dest": "/all-mongodb.html"
-    },
-    {
       "src": "/(.*)",
-      "dest": "/all-mongodb.html"
+      "dest": "/server.js"
     }
   ]
 }
