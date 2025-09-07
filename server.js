@@ -19,7 +19,13 @@ app.use('/images', express.static('images'));
 app.use(express.static(__dirname));
 
 // MongoDB Connection
+let isConnected = false;
+
 const connectDB = async () => {
+  if (isConnected) {
+    return;
+  }
+  
   try {
     const mongoUri = process.env.MONGODB_URI || config.MONGODB_URI;
     console.log('Connecting to MongoDB...');
@@ -27,14 +33,16 @@ const connectDB = async () => {
     const conn = await mongoose.connect(mongoUri, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
-      socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
-      bufferMaxEntries: 0, // Disable mongoose buffering
-      bufferCommands: false, // Disable mongoose buffering
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      bufferMaxEntries: 0,
+      bufferCommands: false,
     });
     console.log(`MongoDB Connected: ${conn.connection.host}`);
+    isConnected = true;
   } catch (error) {
     console.error('Database connection error:', error);
+    isConnected = false;
     // Don't exit in serverless environment
     if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
       process.exit(1);
@@ -107,8 +115,8 @@ const authenticateToken = (req, res, next) => {
 // User Registration
 app.post('/api/register', async (req, res) => {
   try {
-    // Check if MongoDB is connected
-    if (mongoose.connection.readyState !== 1) {
+    // Ensure MongoDB is connected
+    if (!isConnected || mongoose.connection.readyState !== 1) {
       console.log('MongoDB not connected, attempting to reconnect...');
       await connectDB();
     }
@@ -148,8 +156,8 @@ app.post('/api/register', async (req, res) => {
 // User Login
 app.post('/api/login', async (req, res) => {
   try {
-    // Check if MongoDB is connected
-    if (mongoose.connection.readyState !== 1) {
+    // Ensure MongoDB is connected
+    if (!isConnected || mongoose.connection.readyState !== 1) {
       console.log('MongoDB not connected, attempting to reconnect...');
       await connectDB();
     }
