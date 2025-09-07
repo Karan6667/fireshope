@@ -23,7 +23,7 @@ let isConnected = false;
 let connectionPromise = null;
 
 const connectDB = async () => {
-  if (isConnected) {
+  if (isConnected && mongoose.connection.readyState === 1) {
     return;
   }
   
@@ -36,18 +36,34 @@ const connectDB = async () => {
       const mongoUri = process.env.MONGODB_URI || config.MONGODB_URI;
       console.log('Connecting to MongoDB...');
       
+      // Disconnect if already connected
+      if (mongoose.connection.readyState !== 0) {
+        await mongoose.disconnect();
+      }
+      
       const conn = await mongoose.connect(mongoUri, {
         useNewUrlParser: true,
         useUnifiedTopology: true,
         serverSelectionTimeoutMS: 10000,
         socketTimeoutMS: 45000,
-        maxPoolSize: 1, // Maintain only one connection in serverless
+        maxPoolSize: 1,
         serverApi: {
           version: '1',
           strict: false,
           deprecationErrors: true,
         }
       });
+      
+      // Wait for connection to be ready
+      await new Promise((resolve, reject) => {
+        if (conn.connection.readyState === 1) {
+          resolve();
+        } else {
+          conn.connection.once('connected', resolve);
+          conn.connection.once('error', reject);
+        }
+      });
+      
       console.log(`MongoDB Connected: ${conn.connection.host}`);
       isConnected = true;
       return conn;
@@ -130,18 +146,6 @@ app.post('/api/register', async (req, res) => {
     // Ensure MongoDB is connected
     await connectDB();
     
-    // Wait for connection to be ready
-    if (mongoose.connection.readyState !== 1) {
-      console.log('Waiting for MongoDB connection...');
-      await new Promise((resolve) => {
-        mongoose.connection.once('connected', resolve);
-      });
-    }
-    
-    if (!isConnected) {
-      return res.status(500).json({ error: 'Database connection failed' });
-    }
-
     const { email, password } = req.body;
 
     // Check if user already exists
@@ -180,18 +184,6 @@ app.post('/api/login', async (req, res) => {
     // Ensure MongoDB is connected
     await connectDB();
     
-    // Wait for connection to be ready
-    if (mongoose.connection.readyState !== 1) {
-      console.log('Waiting for MongoDB connection...');
-      await new Promise((resolve) => {
-        mongoose.connection.once('connected', resolve);
-      });
-    }
-    
-    if (!isConnected) {
-      return res.status(500).json({ error: 'Database connection failed' });
-    }
-
     const { email, password } = req.body;
 
     // Find user
