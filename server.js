@@ -18,68 +18,23 @@ app.use('/images', express.static('images'));
 // Serve static frontend files (including all-mongodb.html)
 app.use(express.static(__dirname));
 
-// MongoDB Connection
-let isConnected = false;
-let connectionPromise = null;
-
+// MongoDB Connection - Connect before defining routes
 const connectDB = async () => {
-  if (isConnected && mongoose.connection.readyState === 1) {
-    return;
+  try {
+    const mongoUri = process.env.MONGODB_URI || config.MONGODB_URI;
+    console.log('Connecting to MongoDB...');
+    
+    await mongoose.connect(mongoUri, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    
+    console.log(`MongoDB Connected: ${mongoose.connection.host}`);
+  } catch (error) {
+    console.error('Database connection error:', error);
+    process.exit(1);
   }
-  
-  if (connectionPromise) {
-    return connectionPromise;
-  }
-  
-  connectionPromise = (async () => {
-    try {
-      const mongoUri = process.env.MONGODB_URI || config.MONGODB_URI;
-      console.log('Connecting to MongoDB...');
-      
-      // Disconnect if already connected
-      if (mongoose.connection.readyState !== 0) {
-        await mongoose.disconnect();
-      }
-      
-      const conn = await mongoose.connect(mongoUri, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-        serverSelectionTimeoutMS: 10000,
-        socketTimeoutMS: 45000,
-        maxPoolSize: 1,
-        serverApi: {
-          version: '1',
-          strict: false,
-          deprecationErrors: true,
-        }
-      });
-      
-      // Wait for connection to be ready
-      await new Promise((resolve, reject) => {
-        if (conn.connection.readyState === 1) {
-          resolve();
-        } else {
-          conn.connection.once('connected', resolve);
-          conn.connection.once('error', reject);
-        }
-      });
-      
-      console.log(`MongoDB Connected: ${conn.connection.host}`);
-      isConnected = true;
-      return conn;
-    } catch (error) {
-      console.error('Database connection error:', error);
-      isConnected = false;
-      connectionPromise = null;
-      throw error;
-    }
-  })();
-  
-  return connectionPromise;
 };
-
-// Connect to database
-connectDB();
 
 // User Schema
 const userSchema = new mongoose.Schema({
@@ -120,6 +75,7 @@ const Cart = mongoose.model('Cart', cartSchema);
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || config.JWT_SECRET || 'your-secret-key';
 
+
 // Middleware to verify JWT token
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -143,9 +99,6 @@ const authenticateToken = (req, res, next) => {
 // User Registration
 app.post('/api/register', async (req, res) => {
   try {
-    // Ensure MongoDB is connected
-    await connectDB();
-    
     const { email, password } = req.body;
 
     // Check if user already exists
@@ -181,9 +134,6 @@ app.post('/api/register', async (req, res) => {
 // User Login
 app.post('/api/login', async (req, res) => {
   try {
-    // Ensure MongoDB is connected
-    await connectDB();
-    
     const { email, password } = req.body;
 
     // Find user
@@ -761,14 +711,28 @@ app.use((req, res, next) => {
   next();
 });
 
-// Start server (only if not in Vercel environment)
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-  });
-} else {
-  console.log('Running in Vercel environment');
-}
+// Startup function
+const startServer = async () => {
+  try {
+    // Connect to database first
+    await connectDB();
+    
+    // Start server (only if not in Vercel environment)
+    if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+      app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+      });
+    } else {
+      console.log('Running in Vercel environment');
+    }
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+// Start the server
+startServer();
 
 // Export for Vercel
 module.exports = app;
