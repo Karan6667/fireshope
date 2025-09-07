@@ -20,34 +20,42 @@ app.use(express.static(__dirname));
 
 // MongoDB Connection
 let isConnected = false;
+let connectionPromise = null;
 
 const connectDB = async () => {
   if (isConnected) {
     return;
   }
   
-  try {
-    const mongoUri = process.env.MONGODB_URI || config.MONGODB_URI;
-    console.log('Connecting to MongoDB...');
-    
-    const conn = await mongoose.connect(mongoUri, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 45000,
-      bufferMaxEntries: 0,
-      bufferCommands: false,
-    });
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
-    isConnected = true;
-  } catch (error) {
-    console.error('Database connection error:', error);
-    isConnected = false;
-    // Don't exit in serverless environment
-    if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-      process.exit(1);
-    }
+  if (connectionPromise) {
+    return connectionPromise;
   }
+  
+  connectionPromise = (async () => {
+    try {
+      const mongoUri = process.env.MONGODB_URI || config.MONGODB_URI;
+      console.log('Connecting to MongoDB...');
+      
+      const conn = await mongoose.connect(mongoUri, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+        serverSelectionTimeoutMS: 10000,
+        socketTimeoutMS: 45000,
+        bufferMaxEntries: 0,
+        bufferCommands: false,
+      });
+      console.log(`MongoDB Connected: ${conn.connection.host}`);
+      isConnected = true;
+      return conn;
+    } catch (error) {
+      console.error('Database connection error:', error);
+      isConnected = false;
+      connectionPromise = null;
+      throw error;
+    }
+  })();
+  
+  return connectionPromise;
 };
 
 // Connect to database
@@ -116,9 +124,10 @@ const authenticateToken = (req, res, next) => {
 app.post('/api/register', async (req, res) => {
   try {
     // Ensure MongoDB is connected
-    if (!isConnected || mongoose.connection.readyState !== 1) {
-      console.log('MongoDB not connected, attempting to reconnect...');
-      await connectDB();
+    await connectDB();
+    
+    if (!isConnected) {
+      return res.status(500).json({ error: 'Database connection failed' });
     }
 
     const { email, password } = req.body;
@@ -157,9 +166,10 @@ app.post('/api/register', async (req, res) => {
 app.post('/api/login', async (req, res) => {
   try {
     // Ensure MongoDB is connected
-    if (!isConnected || mongoose.connection.readyState !== 1) {
-      console.log('MongoDB not connected, attempting to reconnect...');
-      await connectDB();
+    await connectDB();
+    
+    if (!isConnected) {
+      return res.status(500).json({ error: 'Database connection failed' });
     }
 
     const { email, password } = req.body;
@@ -279,6 +289,13 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
 // Get all products with filters
 app.get('/api/products', async (req, res) => {
   try {
+    // Ensure MongoDB is connected
+    await connectDB();
+    
+    if (!isConnected) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+
     const { 
       category, 
       minPrice, 
