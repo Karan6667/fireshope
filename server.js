@@ -41,8 +41,12 @@ const connectDB = async () => {
         useUnifiedTopology: true,
         serverSelectionTimeoutMS: 10000,
         socketTimeoutMS: 45000,
-        bufferMaxEntries: 0,
-        bufferCommands: false,
+        maxPoolSize: 1, // Maintain only one connection in serverless
+        serverApi: {
+          version: '1',
+          strict: false,
+          deprecationErrors: true,
+        }
       });
       console.log(`MongoDB Connected: ${conn.connection.host}`);
       isConnected = true;
@@ -126,6 +130,14 @@ app.post('/api/register', async (req, res) => {
     // Ensure MongoDB is connected
     await connectDB();
     
+    // Wait for connection to be ready
+    if (mongoose.connection.readyState !== 1) {
+      console.log('Waiting for MongoDB connection...');
+      await new Promise((resolve) => {
+        mongoose.connection.once('connected', resolve);
+      });
+    }
+    
     if (!isConnected) {
       return res.status(500).json({ error: 'Database connection failed' });
     }
@@ -167,6 +179,14 @@ app.post('/api/login', async (req, res) => {
   try {
     // Ensure MongoDB is connected
     await connectDB();
+    
+    // Wait for connection to be ready
+    if (mongoose.connection.readyState !== 1) {
+      console.log('Waiting for MongoDB connection...');
+      await new Promise((resolve) => {
+        mongoose.connection.once('connected', resolve);
+      });
+    }
     
     if (!isConnected) {
       return res.status(500).json({ error: 'Database connection failed' });
