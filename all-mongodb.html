@@ -460,6 +460,10 @@
         // API Configuration (works in local, hosted, and file:// environments)
         const IS_FILE_PROTOCOL = window.location && window.location.protocol === 'file:';
         const API_BASE_URL = IS_FILE_PROTOCOL ? 'http://localhost:5000/api' : `${window.location.origin}/api`;
+        
+        // Debug logging
+        console.log('API_BASE_URL:', API_BASE_URL);
+        console.log('Current origin:', window.location.origin);
 
         // API Helper Functions
         const api = {
@@ -484,9 +488,13 @@
 
             // Products
             async getProducts() {
+                console.log('Fetching products from:', `${API_BASE_URL}/products`);
                 const response = await fetch(`${API_BASE_URL}/products`);
+                console.log('Response status:', response.status);
                 if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`);
+                    const errorText = await response.text();
+                    console.error('API Error:', errorText);
+                    throw new Error(`Server error: ${response.status} - ${errorText}`);
                 }
                 return response.json();
             },
@@ -666,8 +674,8 @@
                         {error && <div className="error-message">{error}</div>}
                         <form onSubmit={handleSubmit} className="signup-form">
                             {!isLogin && (
-                                <div className="form-group">
-                                    <input
+                            <div className="form-group">
+                                <input
                                         type="text"
                                         placeholder="Full Name"
                                         required
@@ -710,14 +718,14 @@
                             </button>
                         </form>
                         {isLogin && (
-                            <div className="form-footer">
-                                <p>
+                        <div className="form-footer">
+                            <p>
                                     Don't have an account? 
                                     <button onClick={() => setAuthMode('signup')} style={{background: 'none', border: 'none', color: '#22C55E', fontWeight: '500', textDecoration: 'none', cursor: 'pointer'}}>
                                         Sign up
                                     </button>
-                                </p>
-                            </div>
+                            </p>
+                        </div>
                         )}
                     </div>
                 </div>
